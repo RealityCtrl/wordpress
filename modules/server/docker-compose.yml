@@ -1,0 +1,56 @@
+version: '3'
+services:
+  db:
+    image: mysql:8.0
+    # name our containers so we can easily reference them
+    container_name: db
+    restart: unless-stopped
+    # if you use mysql version 8 you need PHP to handle 
+    #   passwords correctly
+    command: '--default-authentication-plugin=mysql_native_password'
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/mysql
+  
+  wordpress:
+    image: wordpress:5-fpm-alpine
+    # wordpress must wait for a database connection
+    depends_on:
+      - db
+    container_name: wordpress
+    restart: unless-stopped
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      # we are going to save our wordpress data in our file system
+      - wordpress:/var/www/html
+      - ${BUCKET}/myTheme/:/var/www/html/wp-content/themes/myTheme
+  
+  webserver:
+    # nginx needs wordpress started first
+    depends_on:
+      - wordpress
+    image: nginx:1.15.12-alpine
+    container_name: webserver
+    restart: unless-stopped
+    # open nginx's ports to access our site!!!
+    # you can of course change your ports for development,
+    #    just make sure you listen to them in nginx
+    ports:
+      - "80:80"  
+      - "443:443" # for https later!
+    volumes:
+      - wordpress:/var/www/html
+      - nginx.conf:/etc/nginx/conf.d
+
+
+volumes:
+  wordpress:
+  dbdata:
