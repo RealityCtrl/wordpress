@@ -1,14 +1,14 @@
 resource "random_password" "database_master_password" {
-  length = 128
+  length = 32
   special = false
 }
 
 resource "random_password" "database_server_password" {
-  length = 128
+  length = 32
   special = false
 }
 resource "random_password" "database_server_user" {
-  length = 128
+  length = 32
   special = false
 }
 

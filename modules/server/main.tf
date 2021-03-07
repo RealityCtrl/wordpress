@@ -104,13 +104,13 @@ sudo chkconfig docker on
 echo "download docker-compose.yml"
 aws s3api get-object --bucket ${var.bucket_name} --key docker-compose.yml docker-compose.yml --region eu-west-1
 echo "download nginx.conf"
-aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx.conf nginx.conf --region eu-west-1
+aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx.conf /nginx/nginx.conf --region eu-west-1
 echo "start compose file"
 docker-compose up -d
 
 echo "download nginx_https.conf"
 rm nginx.conf
-aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx_https.conf nginx.conf --region eu-west-1
+aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx_https.conf /nginx/nginx.conf --region eu-west-1
 echo "restart nginx"
 docker-compose up -d --force-recreate --no-deps webserver
 echo "started"
