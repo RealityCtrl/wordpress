@@ -44,6 +44,7 @@ module "realitctrl_instance" {
   }
   bucket_name       = var.bucket_name
   aws_account_id    = var.aws_account_id
+  cert_email        = var.cert_email
   depends_on = [
       module.realitctrl_config_bucket,
       module.realitctrl_credentials,

@@ -5,3 +5,8 @@ variable "bucket_name" {
 variable "aws_account_id" {
     type=string
 }
+
+variable "cert_email" {
+    type=string
+}
+

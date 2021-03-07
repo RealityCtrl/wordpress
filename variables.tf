@@ -17,3 +17,7 @@ variable "aws_region" {
 variable "aws_profile" {
   type = string
 }
+
+variable "cert_email" {
+    type=string
+}

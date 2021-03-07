@@ -1,7 +1,8 @@
 version: '3'
 services:
   db:
-    image: mysql:8.0
+    image: mysql/mysql-server:latest
+    platform: linux/arm64
     # name our containers so we can easily reference them
     container_name: db
     restart: unless-stopped
@@ -9,12 +10,14 @@ services:
     #   passwords correctly
     command: '--default-authentication-plugin=mysql_native_password'
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: wordpress
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      - 'MYSQL_ROOT_PASSWORD:${MYSQL_ROOT_PASSWORD}'
+      - 'MYSQL_DATABASE:wordpress'
+      - 'MYSQL_USER:${MYSQL_USER}'
+      - 'MYSQL_PASSWORD:${MYSQL_PASSWORD}'
     volumes:
       - dbdata:/var/lib/mysql
+    networks:                                                                                          
+      - app-network 
   
   wordpress:
     image: wordpress:5-fpm-alpine
@@ -24,14 +27,16 @@ services:
     container_name: wordpress
     restart: unless-stopped
     environment:
-      WORDPRESS_DB_HOST: db:3306
-      WORDPRESS_DB_USER: ${MYSQL_USER}
-      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
-      WORDPRESS_DB_NAME: wordpress
+      - WORDPRESS_DB_HOST:db:3306
+      - 'WORDPRESS_DB_USER:${MYSQL_USER}'
+      - 'WORDPRESS_DB_PASSWORD:${MYSQL_PASSWORD}'
+      - WORDPRESS_DB_NAME:wordpress
     volumes:
       # we are going to save our wordpress data in our file system
       - wordpress:/var/www/html
-      - ${BUCKET}/myTheme/:/var/www/html/wp-content/themes/myTheme
+      #- ${BUCKET}/myTheme/:/var/www/html/wp-content/themes/myTheme
+    networks:                                                                                          
+      - app-network 
   
   webserver:
     # nginx needs wordpress started first
@@ -48,9 +53,30 @@ services:
       - "443:443" # for https later!
     volumes:
       - wordpress:/var/www/html
-      - nginx.conf:/etc/nginx/conf.d
-
+      - /nginx.conf:/etc/nginx/conf.d
+      - certbotdata:/etc/letsencrypt                                                                   
+    networks:                                                                                          
+      - app-network 
+  
+  certbot:                                                                                             
+    depends_on:                                                                                        
+      - webserver                                                                                      
+    image: certbot/certbot                                                                             
+    container_name: certbot                                                                            
+    volumes:                                                                                           
+      # we save our directory of keys on our host server                                            
+      - certbotdata:/etc/letsencrypt                                                                   
+      # we bind our wordpress site to the html root                                                 
+      - wordpress:/var/www/html                                                                        
+    # this command will generate the certificate.                                                   
+    # make sure to change your -d and --email flags                                                 
+    command: 'certonly --webroot --webroot-path=/var/www/html --email ${EMAIL} --agree-tos --no-eff-email --force-renewal -d ${DOMAIN} -d www.${DOMAIN}'  
 
 volumes:
   wordpress:
   dbdata:
+  certbotdata:
+
+networks:
+  app-network:
+    driver: bridge

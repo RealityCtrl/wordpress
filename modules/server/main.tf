@@ -13,10 +13,12 @@ data "aws_ssm_parameter" "db_user_username" {
 data "template_file" "compose" {
     template = file("${path.module}/docker-compose.yml")
     vars = {
-        MYSQL_USER = jsonencode(data.aws_ssm_parameter.db_user_username)
-        MYSQL_PASSWORD =jsonencode(data.aws_ssm_parameter.db_user_pw)
-        MYSQL_ROOT_PASSWORD = jsonencode(data.aws_ssm_parameter.db_master_pw)
+        MYSQL_USER = data.aws_ssm_parameter.db_user_username.value
+        MYSQL_PASSWORD = data.aws_ssm_parameter.db_user_pw.value
+        MYSQL_ROOT_PASSWORD = data.aws_ssm_parameter.db_master_pw.value
         BUCKET = "https://s3.amazonaws.com/realityctrl.com"
+        EMAIL = var.cert_email
+        DOMAIN = "realityctrl.com"
     }
 }
 
@@ -39,6 +41,19 @@ resource "aws_s3_bucket_object" "nginx_s3" {
   content = data.template_file.nginx.rendered
 }
 
+data "template_file" "nginx_https" {
+    template = file("${path.module}/nginx_https.conf")
+    vars = {
+        DOMAIN = "realityctrl.com"
+    }
+}
+
+resource "aws_s3_bucket_object" "nginx_https_s3" {
+  bucket = var.bucket_name
+  key = "nginx/nginx_https.conf"
+  content = data.template_file.nginx_https.rendered
+}
+
 data "aws_ami" "amazon_linux_arm64_ami" {
   most_recent = true
   filter{
@@ -57,21 +72,48 @@ resource "aws_instance" "wordpress" {
     ami           = data.aws_ami.amazon_linux_arm64_ami.id
     instance_type = "t4g.micro"
     iam_instance_profile = aws_iam_instance_profile.wordpress_profile.name
-    user_data = <<-EOT
-        sudo yum update -y
-        sudo yum install -y python3
-        sudo yum install -y docker
+    user_data = <<EOT
+#!/bin/bash
+sudo yum install -y https://s3.eu-west-1.amazonaws.com/amazon-ssm-eu-west-1/latest/linux_arm64/amazon-ssm-agent.rpm
+echo "yum update"
+sudo yum update
 
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-        unzip awscliv2.zip
-        sudo ./aws/install
+echo "yum install docker"
+sudo yum install -y docker
 
-        pip install docker-compose
-        sudo service docker start
-        aws s3api get-object --bucket ${var.bucket_name} -key docker-compose.yml docker-compose.yml
-        aws s3api get-object --bucket ${var.bucket_name} -key nginx/nginx.conf nginx.conf
-        docker compose up
-      
+echo "yum install zip uzip"
+sudo yum install -y zip unzip 
+
+echo "install awscli"
+curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+echo "install docker-compose"
+sudo yum install -y python37 python3-devel.$(uname -m) libpython3.7-dev libffi-devel openssl-devel 
+sudo yum groupinstall -y "Development Tools" # need gcc and friends
+sudo python3 -m pip install -U pip  # make sure pip is up2date
+python3 -m pip install docker-compose 
+docker-compose --version
+
+echo "start docker service"
+sudo service docker start
+sudo usermod -a -G docker ec2-user
+sudo chkconfig docker on
+
+echo "download docker-compose.yml"
+aws s3api get-object --bucket ${var.bucket_name} --key docker-compose.yml docker-compose.yml --region eu-west-1
+echo "download nginx.conf"
+aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx.conf nginx.conf --region eu-west-1
+echo "start compose file"
+docker-compose up -d
+
+echo "download nginx_https.conf"
+rm nginx.conf
+aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx_https.conf nginx.conf --region eu-west-1
+echo "restart nginx"
+docker-compose up -d --force-recreate --no-deps webserver
+echo "started"
     EOT
     root_block_device {
       volume_type = "gp3"
@@ -79,7 +121,7 @@ resource "aws_instance" "wordpress" {
       iops=3000
       throughput=125
     }
-  key_name = "wordpress.pem"
+  key_name = "wordpress"
 }
 
 resource "aws_eip" "lb" {
