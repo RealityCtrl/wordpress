@@ -101,15 +101,18 @@ sudo service docker start
 sudo usermod -a -G docker ec2-user
 sudo chkconfig docker on
 
+mkdir nginx
 echo "download docker-compose.yml"
 aws s3api get-object --bucket ${var.bucket_name} --key docker-compose.yml docker-compose.yml --region eu-west-1
 echo "download nginx.conf"
 aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx.conf /nginx/nginx.conf --region eu-west-1
 echo "start compose file"
-docker-compose up -d
+docker-compose up -d db wordpress webserver
+
+docker-compose up --no-deps certbot
 
 echo "download nginx_https.conf"
-rm nginx.conf
+rm nginx/nginx.conf
 aws s3api get-object --bucket ${var.bucket_name} --key nginx/nginx_https.conf /nginx/nginx.conf --region eu-west-1
 echo "restart nginx"
 docker-compose up -d --force-recreate --no-deps webserver

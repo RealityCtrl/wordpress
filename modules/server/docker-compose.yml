@@ -1,7 +1,7 @@
 version: '3'
 services:
   db:
-    image: mysql/mysql-server:latest
+    image: mysql/mysql-server:latest-aarch64
     platform: linux/arm64
     # name our containers so we can easily reference them
     container_name: db
@@ -10,10 +10,10 @@ services:
     #   passwords correctly
     command: '--default-authentication-plugin=mysql_native_password'
     environment:
-      - 'MYSQL_ROOT_PASSWORD:${MYSQL_ROOT_PASSWORD}'
-      - 'MYSQL_DATABASE:wordpress'
-      - 'MYSQL_USER:${MYSQL_USER}'
-      - 'MYSQL_PASSWORD:${MYSQL_PASSWORD}'
+      - 'MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}'
+      - 'MYSQL_DATABASE=wordpress'
+      - 'MYSQL_USER=${MYSQL_USER}'
+      - 'MYSQL_PASSWORD=${MYSQL_PASSWORD}'
     volumes:
       - dbdata:/var/lib/mysql
     networks:                                                                                          
@@ -27,10 +27,10 @@ services:
     container_name: wordpress
     restart: unless-stopped
     environment:
-      - WORDPRESS_DB_HOST:db:3306
-      - 'WORDPRESS_DB_USER:${MYSQL_USER}'
-      - 'WORDPRESS_DB_PASSWORD:${MYSQL_PASSWORD}'
-      - WORDPRESS_DB_NAME:wordpress
+      - WORDPRESS_DB_HOST=db:3306
+      - 'WORDPRESS_DB_USER=${MYSQL_USER}'
+      - 'WORDPRESS_DB_PASSWORD=${MYSQL_PASSWORD}'
+      - 'WORDPRESS_DB_NAME=wordpress'
     volumes:
       # we are going to save our wordpress data in our file system
       - wordpress:/var/www/html
